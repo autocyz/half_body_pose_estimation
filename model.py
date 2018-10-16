@@ -11,26 +11,6 @@ def conv_relu(inp, out, kernel, stride=1, pad=1):
     )
 
 
-def stage_block_CPM():
-    return nn.Sequential(
-        conv_relu(128, 128, 3, 1, 1),
-        conv_relu(128, 128, 3, 1, 1),
-        conv_relu(128, 128, 3, 1, 1),
-        conv_relu(128, 512, 1, 1, 0),
-        nn.Conv2d(512, 5, 1, 1, 0)
-    )
-
-
-def stage_block_PAF():
-    return nn.Sequential(
-        conv_relu(128, 128, 3, 1, 1),
-        conv_relu(128, 128, 3, 1, 1),
-        conv_relu(128, 128, 3, 1, 1),
-        conv_relu(128, 512, 1, 1, 0),
-        nn.Conv2d(512, 6, 1, 1, 0)
-    )
-
-
 def stage_first():
     return nn.Sequential(       # default input shape(320, 240)
         conv_relu(3, 64, 3, 1, 1),
@@ -51,6 +31,27 @@ def stage_first():
     )
 
 
+def stage_block_CPM():
+    return nn.Sequential(
+        conv_relu(128, 128, 3, 1, 1),
+        conv_relu(128, 128, 3, 1, 1),
+        conv_relu(128, 128, 3, 1, 1),
+        conv_relu(128, 512, 1, 1, 0),
+        nn.Conv2d(512, 5, 1, 1, 0)
+    )
+
+
+def stage_block_PAF():
+    return nn.Sequential(
+        conv_relu(128, 128, 3, 1, 1),
+        conv_relu(128, 128, 3, 1, 1),
+        conv_relu(128, 128, 3, 1, 1),
+        conv_relu(128, 512, 1, 1, 0),
+        nn.Conv2d(512, 6, 1, 1, 0)
+    )
+
+
+
 def stage_last_CPM():
     return nn.Sequential(
         conv_relu(128+5+6, 128, 7, 1, 3),
@@ -59,7 +60,8 @@ def stage_last_CPM():
         conv_relu(128, 128, 7, 1, 3),
         conv_relu(128, 128, 7, 1, 3),
         conv_relu(128, 128, 1, 1, 0),
-        conv_relu(128, 5, 1, 1, 0)
+        # conv_relu(128, 5, 1, 1, 0)
+        nn.Conv2d(128, 5, 1, 1, 0)
     )
 
 
@@ -71,7 +73,8 @@ def stage_last_PAF():
         conv_relu(128, 128, 7, 1, 3),
         conv_relu(128, 128, 7, 1, 3),
         conv_relu(128, 128, 1, 1, 0),
-        conv_relu(128, 6, 1, 1, 0)
+        # conv_relu(128, 6, 1, 1, 0),
+        nn.Conv2d(128, 6, 1, 1, 0)
     )
 
 
@@ -86,9 +89,13 @@ class RTNet(nn.Module):
 
     def forward(self, input):
         y = self.stage_first(input)
-        y = torch.cat((y, self.stage_block_cpm(y), self.stage_block_paf(y)), 1)
-        y = torch.cat((self.stage_last_cpm(y), self.stage_last_paf(y)), 1)
-        return y
+        cpm_1 = self.stage_block_cpm(y)
+        paf_1 = self.stage_block_paf(y)
+        y = torch.cat((y, cpm_1, paf_1), 1)
+        cpm = self.stage_last_cpm(y)
+        paf = self.stage_last_paf(y)
+        # y = torch.cat((self.stage_last_cpm(y), self.stage_last_paf(y)), 1)
+        return cpm_1, paf_1, cpm, paf
 
 
 if __name__ == '__main__':

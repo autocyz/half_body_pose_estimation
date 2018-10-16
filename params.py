@@ -28,3 +28,7 @@ params_transform['learning_rate'] = 1e-4
 params_transform['momentum'] = 0.9
 params_transform['weight_decay'] = 1e-4
 params_transform['nesterov'] = True
+params_transform['display'] = 10
+
+# params_transform['pretrain_model'] = './result/checkpoint/1012eppch_0.cpkt'
+params_transform['pretrain_model'] = None

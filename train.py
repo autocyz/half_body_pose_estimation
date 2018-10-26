@@ -63,15 +63,19 @@ def train(train_loader, net, criterion, optimizer, epoch, loader_info=''):
             writer.add_image('paf_target', torch.unsqueeze(pafs[0, :, :, :], 1))
 
             heatmaps_norm = torch.Tensor.unsqueeze(heatmaps[0, :, :, :], 1)
-            heatmaps_norm_max = np.max(np.max(heatmaps_norm, axis=-1), axis=-1).reshape(heatmaps_norm.shape[0], 1, 1, 1)
-            heatmaps_norm_min = np.min(np.min(heatmaps_norm, axis=-1), axis=-1).reshape(heatmaps_norm.shape[0], 1, 1, 1)
+            heatmaps_norm_max = torch.Tensor.max(torch.Tensor.max(heatmaps_norm, dim=-1)[0], dim=-1)[0].\
+                reshape(heatmaps_norm.shape[0], 1, 1, 1)
+            heatmaps_norm_min = torch.Tensor.min(torch.Tensor.min(heatmaps_norm, dim=-1)[0], dim=-1)[0].\
+                reshape(heatmaps_norm.shape[0], 1, 1, 1)
             heatmaps_norm_diff = heatmaps_norm_max - heatmaps_norm_min
             heatmaps_norm = (heatmaps_norm - heatmaps_norm_min) / heatmaps_norm_diff
             writer.add_image('heatmap_predit', heatmaps_norm)
 
             pafs_norm = torch.Tensor.unsqueeze(pafs[0, :, :, :], 1)
-            pafs_norm_max = np.max(np.max(pafs_norm, axis=-1), axis=-1).reshape(pafs_norm.shape[0], 1, 1, 1)
-            pafs_norm_min = np.min(np.min(pafs_norm, axis=-1), axis=-1).reshape(pafs_norm.shape[0], 1, 1, 1)
+            pafs_norm_max = torch.Tensor.max(torch.Tensor.max(pafs_norm, dim=-1)[0], dim=-1)[0].\
+                reshape(pafs_norm.shape[0], 1, 1, 1)
+            pafs_norm_min = torch.Tensor.min(torch.Tensor.min(pafs_norm, dim=-1)[0], dim=-1)[0].\
+                reshape(pafs_norm.shape[0], 1, 1, 1)
             pafs_norm_diff = pafs_norm_max - pafs_norm_min
             pafs_norm = (pafs_norm - pafs_norm_min) / pafs_norm_diff
             writer.add_image('paf_predit', pafs_norm, 1)
@@ -132,13 +136,13 @@ if __name__ == "__main__":
     lr_scheduler = StepLR(optimizer, step_size=5, gamma=0.5)
     criterion = torch.nn.MSELoss(reduction='elementwise_mean').cuda()
 
-    date = '1025'
+    date = '1026'
     writer = SummaryWriter(log_dir='./result/logdir/' + date)
     model_path = os.path.join('./result/checkpoint/', date)
     if not os.path.exists(model_path):
         os.mkdir(model_path)
 
-    params_transform['train_log'] = '从头训练，只不过把AIchanllenge的test数据集也拿来做训练， 测试集仍旧没有变'
+    params_transform['train_log'] = '在1025的基础上降低十倍学习率'
     save_params(model_path, 'parameter', params_transform)
     # writer.add_graph(net, torch.ones(16, 3, 368, 368))
     # if params_transform['has_checkpoint']:

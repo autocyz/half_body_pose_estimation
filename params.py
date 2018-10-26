@@ -21,7 +21,7 @@ params_transform['np'] = 56
 params_transform['sigma'] = 2.0
 
 # train params
-params_transform['epoch_num'] = 100
+params_transform['epoch_num'] = 15
 params_transform['batch_size'] = 16
 params_transform['num_workers'] = 4
 params_transform['learning_rate'] = 1e-4
@@ -30,5 +30,6 @@ params_transform['weight_decay'] = 1e-4
 params_transform['nesterov'] = True
 params_transform['display'] = 10
 
-# params_transform['pretrain_model'] = './result/checkpoint/1012eppch_0.cpkt'
+# params_transform['pretrain_model'] = './result/checkpoint/1019/epoch_1.cpkt'
 params_transform['pretrain_model'] = None
+

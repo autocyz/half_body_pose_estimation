@@ -6,14 +6,15 @@
 @time: 18-10-15
 """
 
+
 import torch
 import os
 import time
 import numpy as np
 from params import params_transform
 from dataset import AIChallenge
-from model import RTNet
-
+from model.RTNet import RTNet, RTNet_Half
+from model.peleenet import  PeleePoseNet
 from torch.utils.data.dataloader import DataLoader
 from torch.optim.lr_scheduler import StepLR
 from tensorboardX import SummaryWriter
@@ -21,22 +22,34 @@ from utils import save_params, get_lr
 
 
 def train(train_loader, net, criterion, optimizer, epoch, loader_info=''):
+    time4 = 0
     for i, (img, heatmaps, pafs) in enumerate(train_loader):
+        time4_last = time4
         time0 = time.clock()
         heatmaps = heatmaps.float().cuda()
         pafs = pafs.float().cuda()
         img = img.cuda()
 
+        # time1 = time.clock()
+        # cpm_1, paf_1, cpm_p, paf_p = net(img)
+        # time2 = time.clock()
+        #
+        # loss_cpm1 = criterion(heatmaps, cpm_1)
+        # loss_paf1 = criterion(pafs, paf_1)
+        # loss_cpm = criterion(heatmaps, cpm_p)
+        # loss_paf = criterion(pafs, paf_p)
+        # total_loss = loss_cpm + loss_paf + loss_cpm1 + loss_paf1
+        # # total_loss = loss_cpm + loss_paf
+
         time1 = time.clock()
-        cpm_1, paf_1, cpm_p, paf_p = net(img)
+        cpm_p, paf_p = net(img)
         time2 = time.clock()
 
-        loss_cpm1 = criterion(heatmaps, cpm_1)
-        loss_paf1 = criterion(pafs, paf_1)
         loss_cpm = criterion(heatmaps, cpm_p)
         loss_paf = criterion(pafs, paf_p)
-        total_loss = loss_cpm + loss_paf + loss_cpm1 + loss_paf1
-        # total_loss = loss_cpm + loss_paf
+        # total_loss = loss_cpm + loss_paf + loss_cpm1 + loss_paf1
+        total_loss = loss_cpm + loss_paf
+
 
         time3 = time.clock()
         optimizer.zero_grad()
@@ -52,17 +65,27 @@ def train(train_loader, net, criterion, optimizer, epoch, loader_info=''):
         writer.add_scalars('all_loss', {'cpm': loss_cpm.item(), 'paf': loss_paf.item(), 'total': total_loss.item()}, total_iter)
 
         print('Epoch [{}/{}]\tStep [{}/{} {}]\tLr [{}]'
-              '\tloss_cpm_1 {:.3f}\tloss_paf_1 {:.3f}\tloss_cpm {:.3f}'
-              '\tloss_paf {:.3f} \tTotal_loss {:.3f}\n'.
+              '\tloss_cpm {:.3f}\tloss_paf {:.3f} \tTotal_loss {:.3f}\n'
+              'T_dataprocess:{:.5f} T_forward:{:.5f} T_backward:{:.5f}'.
               format(epoch, params_transform['epoch_num'], i,
                      len(train_loader), loader_info, get_lr(optimizer),
-                     loss_cpm1.item(), loss_paf1.item(), loss_cpm.item(), loss_paf.item(), total_loss.item()))
+                     loss_cpm.item(),
+                     loss_paf.item(), total_loss.item(),
+                     time0-time4_last, time2-time1, time4-time3))
 
         if total_iter % params_transform['display'] == 0:
-            writer.add_image('heatmap_target', torch.unsqueeze(heatmaps[0, :, :, :], 1))
-            writer.add_image('paf_target', torch.unsqueeze(pafs[0, :, :, :], 1))
+            writer.add_image('heatmap_target', torch.Tensor.unsqueeze(heatmaps[0, :, :, :], 1))
 
-            heatmaps_norm = torch.Tensor.unsqueeze(heatmaps[0, :, :, :], 1)
+            pafs_norm = torch.Tensor.unsqueeze(pafs[0, :, :, :], 1)
+            pafs_norm_max = torch.Tensor.max(torch.Tensor.max(pafs_norm, dim=-1)[0], dim=-1)[0].\
+                reshape(pafs_norm.shape[0], 1, 1, 1)
+            pafs_norm_min = torch.Tensor.min(torch.Tensor.min(pafs_norm, dim=-1)[0], dim=-1)[0].\
+                reshape(pafs_norm.shape[0], 1, 1, 1)
+            pafs_norm_diff = pafs_norm_max - pafs_norm_min
+            pafs_norm = (pafs_norm - pafs_norm_min) / pafs_norm_diff
+            writer.add_image('paf_target', pafs_norm)
+
+            heatmaps_norm = torch.Tensor.unsqueeze(cpm_p[0, :, :, :], 1)
             heatmaps_norm_max = torch.Tensor.max(torch.Tensor.max(heatmaps_norm, dim=-1)[0], dim=-1)[0].\
                 reshape(heatmaps_norm.shape[0], 1, 1, 1)
             heatmaps_norm_min = torch.Tensor.min(torch.Tensor.min(heatmaps_norm, dim=-1)[0], dim=-1)[0].\
@@ -71,7 +94,7 @@ def train(train_loader, net, criterion, optimizer, epoch, loader_info=''):
             heatmaps_norm = (heatmaps_norm - heatmaps_norm_min) / heatmaps_norm_diff
             writer.add_image('heatmap_predit', heatmaps_norm)
 
-            pafs_norm = torch.Tensor.unsqueeze(pafs[0, :, :, :], 1)
+            pafs_norm = torch.Tensor.unsqueeze(paf_p[0, :, :, :], 1)
             pafs_norm_max = torch.Tensor.max(torch.Tensor.max(pafs_norm, dim=-1)[0], dim=-1)[0].\
                 reshape(pafs_norm.shape[0], 1, 1, 1)
             pafs_norm_min = torch.Tensor.min(torch.Tensor.min(pafs_norm, dim=-1)[0], dim=-1)[0].\
@@ -124,7 +147,9 @@ if __name__ == "__main__":
                             )
 
     torch.backends.cudnn.benchmark = True
-    net = RTNet()
+    # net = RTNet()
+    # net = RTNet_Half()
+    net = PeleePoseNet()
     if params_transform['pretrain_model']:
         print("loading pre_trained model :", params_transform['pretrain_model'])
         params_transform['has_checkpoint'] = True
@@ -136,13 +161,13 @@ if __name__ == "__main__":
     lr_scheduler = StepLR(optimizer, step_size=5, gamma=0.5)
     criterion = torch.nn.MSELoss(reduction='elementwise_mean').cuda()
 
-    date = '1026'
+    date = '1031'
     writer = SummaryWriter(log_dir='./result/logdir/' + date)
     model_path = os.path.join('./result/checkpoint/', date)
     if not os.path.exists(model_path):
         os.mkdir(model_path)
 
-    params_transform['train_log'] = '在1025的基础上降低十倍学习率'
+    params_transform['train_log'] = '使用peleenet网络进行训练'
     save_params(model_path, 'parameter', params_transform)
     # writer.add_graph(net, torch.ones(16, 3, 368, 368))
     # if params_transform['has_checkpoint']:
@@ -184,16 +209,19 @@ if __name__ == "__main__":
                 heatmaps = heatmaps.float().cuda()
                 pafs = pafs.float().cuda()
                 img = img.cuda()
-                cpm_1, paf_1, cpm_p, paf_p = net(img)
+                # cpm_1, paf_1, cpm_p, paf_p = net(img)
+                #
+                # loss_cpm1 = criterion(heatmaps, cpm_1)
+                # loss_paf1 = criterion(pafs, paf_1)
+                # loss_cpm = criterion(heatmaps, cpm_p)
+                # loss_paf = criterion(pafs, paf_p)
+                cpm_p, paf_p = net(img)
 
-                loss_cpm1 = criterion(heatmaps, cpm_1)
-                loss_paf1 = criterion(pafs, paf_1)
                 loss_cpm = criterion(heatmaps, cpm_p)
                 loss_paf = criterion(pafs, paf_p)
-                total_loss = loss_cpm + loss_paf + loss_cpm1 + loss_paf1
+                total_loss = loss_cpm + loss_paf
                 val_loss += total_loss
-                if i % 50 == 0:
-                    print('Eval : current loss: ', total_loss)
+                print('Eval {}: current loss:{} calculate_loss:{}'.format(i, total_loss, val_loss))
         val_loss = val_loss / len(val_loader)
         print('epoch [{}] val_loss [{:.4f}]'.format(epoch, val_loss))
         writer.add_scalar('val_loss', val_loss, epoch)

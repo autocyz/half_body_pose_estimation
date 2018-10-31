@@ -4,6 +4,7 @@ import os
 def save_params(path, name, params):
     with open(os.path.join(path, name+'.txt'), 'w') as f:
         for key, val in params.items():
+            print(key, ' : ', val)
             f.write(key + ': ')
             f.write(str(val))
             f.write('\n')

@@ -206,11 +206,11 @@ if __name__ == "__main__":
     index = random.randint(0, dataset.numImages-1)
     print(index)
     # index = 1327
-    (img, heatmaps, pafs) = dataset.__getitem__(index)
+    (img, heatmaps, pafs) = dataset.__getitem__(0)
     print(img.shape)
     writer = SummaryWriter(log_dir='./result')
     writer.add_image('image', (img))
-    print(np.sum(heatmaps[0,:,:]))
+    print(np.sum(heatmaps[0, :, :]))
     writer.add_text('image_name', 'image_index:%d'%index)
 
     for i in range(heatmaps.shape[0]):

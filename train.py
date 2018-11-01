@@ -25,14 +25,14 @@ def train(train_loader, net, criterion, optimizer, epoch, loader_info=''):
     time4 = 0
     for i, (img, heatmaps, pafs) in enumerate(train_loader):
         time4_last = time4
-        time0 = time.clock()
+        time0 = time.time()
         heatmaps = heatmaps.float().cuda()
         pafs = pafs.float().cuda()
         img = img.cuda()
 
-        # time1 = time.clock()
+        # time1 = time.time()
         # cpm_1, paf_1, cpm_p, paf_p = net(img)
-        # time2 = time.clock()
+        # time2 = time.time()
         #
         # loss_cpm1 = criterion(heatmaps, cpm_1)
         # loss_paf1 = criterion(pafs, paf_1)
@@ -41,9 +41,9 @@ def train(train_loader, net, criterion, optimizer, epoch, loader_info=''):
         # total_loss = loss_cpm + loss_paf + loss_cpm1 + loss_paf1
         # # total_loss = loss_cpm + loss_paf
 
-        time1 = time.clock()
+        time1 = time.time()
         cpm_p, paf_p = net(img)
-        time2 = time.clock()
+        time2 = time.time()
 
         loss_cpm = criterion(heatmaps, cpm_p)
         loss_paf = criterion(pafs, paf_p)
@@ -51,12 +51,12 @@ def train(train_loader, net, criterion, optimizer, epoch, loader_info=''):
         total_loss = loss_cpm + loss_paf
 
 
-        time3 = time.clock()
+        time3 = time.time()
         optimizer.zero_grad()
         total_loss.backward()
         # loss_paf.backward()
         optimizer.step()
-        time4 = time.clock()
+        time4 = time.time()
 
         # writer some train information
         total_iter = epoch * len(train_loader) + i
@@ -74,6 +74,7 @@ def train(train_loader, net, criterion, optimizer, epoch, loader_info=''):
                      time0-time4_last, time2-time1, time4-time3))
 
         if total_iter % params_transform['display'] == 0:
+            writer.add_image('image', img[0])
             writer.add_image('heatmap_target', torch.Tensor.unsqueeze(heatmaps[0, :, :, :], 1))
 
             pafs_norm = torch.Tensor.unsqueeze(pafs[0, :, :, :], 1)
@@ -161,13 +162,13 @@ if __name__ == "__main__":
     lr_scheduler = StepLR(optimizer, step_size=5, gamma=0.5)
     criterion = torch.nn.MSELoss(reduction='elementwise_mean').cuda()
 
-    date = '1031'
+    date = '1101'
     writer = SummaryWriter(log_dir='./result/logdir/' + date)
     model_path = os.path.join('./result/checkpoint/', date)
     if not os.path.exists(model_path):
         os.mkdir(model_path)
 
-    params_transform['train_log'] = '使用peleenet网络进行训练'
+    params_transform['train_log'] = '使用peleenet网络进行训练,在昨天的基础上行将学习率降低10倍'
     save_params(model_path, 'parameter', params_transform)
     # writer.add_graph(net, torch.ones(16, 3, 368, 368))
     # if params_transform['has_checkpoint']:
@@ -196,7 +197,7 @@ if __name__ == "__main__":
         # train
         # lr_scheduler.step()
         net.train()
-        time4 = time.clock()
+        time4 = time.time()
         train(test_a_loader, net, criterion, optimizer, epoch, 'test_a')
         train(test_b_loader, net, criterion, optimizer, epoch, 'test_b')
         train(train_loader, net, criterion, optimizer, epoch, 'train')
@@ -221,7 +222,7 @@ if __name__ == "__main__":
                 loss_paf = criterion(pafs, paf_p)
                 total_loss = loss_cpm + loss_paf
                 val_loss += total_loss
-                print('Eval {}: current loss:{} calculate_loss:{}'.format(i, total_loss, val_loss))
+                print('Eval [{}/{}]: current loss:{} calculate_loss:{}'.format(i, len(val_loader), total_loss, val_loss))
         val_loss = val_loss / len(val_loader)
         print('epoch [{}] val_loss [{:.4f}]'.format(epoch, val_loss))
         writer.add_scalar('val_loss', val_loss, epoch)

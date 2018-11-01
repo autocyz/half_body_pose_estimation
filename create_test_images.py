@@ -47,7 +47,7 @@ with torch.no_grad():
             src_img = cv2.resize(src_img, dsize=(368, 368))
         print('\nimage: {} size：{}'.format(name, src_img.shape))
 
-        T_start = time.clock()
+        T_start = time.time()
         img = np.transpose(src_img, [2, 0, 1])
         img = np.asarray(img, dtype=np.float32) / 255.
         img = torch.from_numpy(img)
@@ -55,14 +55,14 @@ with torch.no_grad():
         if use_gpu:
             img = img.cuda()
         print('net inference.....')
-        T_data_process = time.clock()
+        T_data_process = time.time()
         _, _, cpm, paf = net(img)
-        T_net_inference = time.clock()
+        T_net_inference = time.time()
         print('.....net inference')
         heatmaps = cpm.cpu().data.numpy().transpose(0, 2, 3, 1)
         pafs = paf.cpu().data.numpy().transpose(0, 2, 3, 1)
         canvas, joint_list, person_to_joint_assoc = decode_pose(src_img, param, heatmaps[0], pafs[0])
-        T_result_process = time.clock()
+        T_result_process = time.time()
 
         print('data_process: {}\nnet_inference: {}\nresult_process: {}'
               .format(T_data_process - T_start,

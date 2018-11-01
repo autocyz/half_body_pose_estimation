@@ -2,6 +2,7 @@ import torch
 import cv2
 import numpy as np
 from model.RTNet import RTNet, RTNet_Half
+from model.peleenet import PeleePoseNet
 import matplotlib.pyplot as plt
 from tensorboardX import SummaryWriter
 from pose_decode import  decode_pose
@@ -10,20 +11,20 @@ import time
 
 def inference(src_img, net, param, use_gpu=False):
     with torch.no_grad():
-        T_start = time.clock()
+        T_start = time.time()
         img = np.transpose(src_img, [2, 0, 1])
         img = np.asarray(img, dtype=np.float32) / 255.
         img = torch.from_numpy(img)
         img = torch.Tensor.unsqueeze(img, 0)
         if use_gpu:
             img = img.cuda()
-        T_data_process = time.clock()
-        _, _, cpm, paf = net(img)
-        T_net_inference = time.clock()
+        T_data_process = time.time()
+        cpm, paf = net(img)
+        T_net_inference = time.time()
         heatmaps = cpm.cpu().data.numpy().transpose(0, 2, 3, 1)
         pafs = paf.cpu().data.numpy().transpose(0, 2, 3, 1)
         canvas, joint_list, person_to_joint_assoc = decode_pose(src_img, param, heatmaps[0], pafs[0])
-        T_result_process = time.clock()
+        T_result_process = time.time()
 
         print('data_process: {}\nnet_inference: {}\nresult_process: {}'
               .format(T_data_process - T_start,
@@ -31,6 +32,21 @@ def inference(src_img, net, param, use_gpu=False):
                       T_result_process - T_net_inference))
 
         return canvas
+
+def time_test(net, use_gpu):
+    with torch.no_grad() :
+        input = np.random.rand(1, 3, 368, 368).astype(np.float32)
+        input = torch.from_numpy(input)
+        if use_gpu:
+            input = input.cuda()
+        start = time.time()
+        for i in range(100):
+            t1 = time.time()
+            cc = net(input)
+            t2 = time.time()
+            print('every_time: %04d: '%i, t2 - t1)
+        end = time.time()
+        print('total time: ', end - start)
 
 
 
@@ -53,16 +69,16 @@ def showheatmap():
         net.load_state_dict(torch.load(model_path))
         net.eval()
 
-        T_start = time.clock()
+        T_start = time.time()
         img = np.transpose(src_img, [2, 0, 1])
         img = np.asarray(img, dtype=np.float32) / 255.
         img = torch.from_numpy(img)
         img = torch.Tensor.unsqueeze(img, 0)
         if use_gpu:
             img = img.cuda()
-        T_data_process = time.clock()
+        T_data_process = time.time()
         _, _, cpm, paf = net(img)
-        T_net_inference = time.clock()
+        T_net_inference = time.time()
 
         heatmaps = cpm.cpu().data.numpy().transpose(0, 2, 3, 1)
         pafs = paf.cpu().data.numpy().transpose(0, 2, 3, 1)
@@ -78,7 +94,7 @@ def showheatmap():
         writer.add_image('heatmap_target_norm', cc)
 
         canvas, joint_list, person_to_joint_assoc = decode_pose(src_img, param, heatmaps[0], pafs[0])
-        T_result_process = time.clock()
+        T_result_process = time.time()
 
         print('data_process: {}\nnet_inference: {}\nresult_process: {}'
               .format(T_data_process - T_start,
@@ -90,30 +106,36 @@ def showheatmap():
 
 
 if __name__ == '__main__':
-    use_gpu = True
-    is_resize = False
+    use_gpu = False
+
+    is_resize = True
     # model_path = 'result/checkpoint/1030_1/epoch_8_0.028339.cpkt'
-    model_path = 'result/checkpoint/1026/epoch_12_0.025852.cpkt'
+    model_path = 'result/checkpoint/1031/epoch_16_0.014441.cpkt'
     # net = RTNet_Half()
-    net = RTNet()
+    # net = RTNet()
+    net = PeleePoseNet()
     if use_gpu:
         torch.backends.cudnn.benchmark = True
         net = net.cuda()
     net.load_state_dict(torch.load(model_path))
     net.eval()
-    param = {'thre1': 0.3, 'thre2': 0.05, 'thre3': 0.5}
-    capture = cv2.VideoCapture('/mnt/data/project/ulsPoseDetectTrack/data/222.ts')
-    i = 0
-    while(True):
-        i += 1
-        if i%2 == 0:
-            continue
-        retval, img = capture.read()
-        if not retval:
-            break
-        if is_resize:
-            img = cv2.resize(img, (int(368), int(368)))
-        canvas = inference(img, net, param, use_gpu)
-        cv2.imshow('result', canvas)
-        cv2.waitKey(10)
 
+
+    time_test(net, use_gpu)
+
+    # param = {'thre1': 0.3, 'thre2': 0.05, 'thre3': 0.5}
+    # capture = cv2.VideoCapture('/mnt/data/project/ulsPoseDetectTrack/data/111.ts')
+    # i = 0
+    # while(True):
+    #     i += 1
+    #     if i%2 == 0:
+    #         continue
+    #     retval, img = capture.read()
+    #     if not retval:
+    #         break
+    #     if is_resize:
+    #         # img = cv2.resize(img, (int(368), int(368)))
+    #         img = cv2.resize(img, (int(img.shape[1]/2), int(img.shape[0]/2)))
+    #     canvas = inference(img, net, param, use_gpu)
+    #     cv2.imshow('result', canvas)
+    #     cv2.waitKey(10)

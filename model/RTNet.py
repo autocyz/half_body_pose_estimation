@@ -118,10 +118,17 @@ class RTNet_Half(nn.Module):
 
 
 if __name__ == '__main__':
+    import torchstat
+    # compute model size and FLOPs
     model = RTNet_Half()
-    x = torch.randn(1, 3, 368, 368).requires_grad_(True)
-    y = model(x)
-    cc = make_dot(y, params=dict(list(model.named_parameters()) + [('x', x)]))
+    model = RTNet()
+    torchstat.stat(model, (3, 368, 368))
 
+    # plot model graph 
+    # x = torch.randn(1, 3, 368, 368).requires_grad_(True)
+    # y = model(x)
+    # cc = make_dot(y, params=dict(list(model.named_parameters()) + [('x', x)]))
+
+    # compute model params size
     # summary(model, (3, 368, 368), device='cpu')
 

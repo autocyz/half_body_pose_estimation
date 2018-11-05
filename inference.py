@@ -33,6 +33,7 @@ def inference(src_img, net, param, use_gpu=False):
 
         return canvas
 
+
 def time_test(net, use_gpu):
     with torch.no_grad() :
         input = np.random.rand(1, 3, 368, 368).astype(np.float32)
@@ -110,19 +111,20 @@ if __name__ == '__main__':
 
     is_resize = True
     # model_path = 'result/checkpoint/1030_1/epoch_8_0.028339.cpkt'
-    model_path = 'result/checkpoint/1031/epoch_16_0.014441.cpkt'
+    model_path = 'result/checkpoint/1016/epoch_5.cpkt'
     # net = RTNet_Half()
-    # net = RTNet()
-    net = PeleePoseNet()
+    net = RTNet()
+    # net = PeleePoseNet()
     if use_gpu:
         torch.backends.cudnn.benchmark = True
         net = net.cuda()
     net.load_state_dict(torch.load(model_path))
     net.eval()
-
-
+    
+    # test model inference time
     time_test(net, use_gpu)
 
+    # test video human keypoints and limbs, display result
     # param = {'thre1': 0.3, 'thre2': 0.05, 'thre3': 0.5}
     # capture = cv2.VideoCapture('/mnt/data/project/ulsPoseDetectTrack/data/111.ts')
     # i = 0

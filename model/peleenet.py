@@ -2,7 +2,7 @@
 @author: autocyz
 @contact: autocyz@163.com
 @file: peleenet.py
-@function: 
+@function: PeleePoseNet
 @time: 18-10-30
 """
 
@@ -12,6 +12,7 @@ import math
 import torch.nn.functional as F
 from torchsummary import summary
 import torchvision.models.resnet
+import torchstat
 
 def conv_bn_relu(inp, oup, kernel_size=3, stride=1, pad=1, use_relu=True):
     f = [nn.Conv2d(inp, oup, kernel_size, stride, pad, bias=False),
@@ -134,13 +135,18 @@ class PeleePoseNet(nn.Module):
 if __name__ == '__main__':
     from torchviz import make_dot
     net = PeleePoseNet()
-    x = torch.randn(1, 3, 368, 368).requires_grad_(True)
-    y = net(x)
-    cc = make_dot(y, params=dict(list(net.named_parameters()) + [('x', x)]))
-    cc.view('PeleePoseNet')
-    summary(net, (3, 368, 368), device='cpu')
+    # compute model size and FLOPs
+    torchstat.stat(net, (3, 368, 368))
 
-    # torch.save(p.state_dict(), 'peleenet.pth.tar')
+    # draw model graph
+    # x = torch.randn(1, 3, 368, 368).requires_grad_(True)
+    # y = net(x)
+    # cc = make_dot(y, params=dict(list(net.named_parameters()) + [('x', x)]))
+    # cc.view('PeleePoseNet')
+
+    # compute model params size
+    # summary(net, (3, 368, 368), device='cpu')
+
 
 
 

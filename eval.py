@@ -36,12 +36,18 @@ import numpy as np
 def load_annotations(anno_file, return_dict):
     """Convert annotation JSON file."""
 
+    delta_14_point = 2 * np.array([0.01388152, 0.01515228, 0.01057665, 0.01417709,
+                                    0.01497891, 0.01402144, 0.03909642, 0.03686941, 0.01981803,
+                                    0.03843971, 0.03412318, 0.02415081, 0.01291456, 0.01236173])
+
+    # 0-r-shoulder 3-l-shoulder 12-head 13-neck
+    point_4_id = [0, 3, 12, 13]
+
     annotations = dict()
     annotations['image_ids'] = set([])
     annotations['annos'] = dict()
-    annotations['delta'] = 2 * np.array([0.01388152, 0.01515228, 0.01057665, 0.01417709,
-                                         0.01497891, 0.01402144, 0.03909642, 0.03686941, 0.01981803,
-                                         0.03843971, 0.03412318, 0.02415081, 0.01291456, 0.01236173])
+    annotations['delta'] = delta_14_point[point_4_id]
+
     try:
         annos = json.load(open(anno_file, 'r'))
     except Exception:
@@ -104,8 +110,9 @@ def compute_oks(anno, predict, delta):
 
     # for every human keypoint annotation
     for i in range(anno_count):
-        anno_key = anno['keypoint_annos'].keys()[i]
+        anno_key = list(anno['keypoint_annos'].keys())[i]
         anno_keypoints = np.reshape(anno['keypoint_annos'][anno_key], (14, 3))
+        anno_keypoints = anno_keypoints[[0, 3, 12, 13], :]
         visible = anno_keypoints[:, 2] == 1
         bbox = anno['human_annos'][anno_key]
         scale = np.float32((bbox[3] - bbox[1]) * (bbox[2] - bbox[0]))
@@ -115,9 +122,9 @@ def compute_oks(anno, predict, delta):
         else:
             # for every predicted human
             for j in range(predict_count):
-                predict_key = predict.keys()[j]
-                predict_keypoints = np.reshape(predict[predict_key], (14, 3))
-                dis = np.sum((anno_keypoints[visible, :2] \
+                predict_key = list(predict.keys())[j]
+                predict_keypoints = np.reshape(predict[predict_key], (4, 3))
+                dis = np.sum((anno_keypoints[visible, :2]
                               - predict_keypoints[visible, :2]) ** 2, axis=1)
                 oks[i, j] = np.mean(np.exp(-dis / 2 / delta[visible] ** 2 / (scale + 1)))
     return oks
@@ -136,8 +143,8 @@ def keypoint_eval(predictions, annotations, return_dict):
     for image_id in annotations['image_ids']:
         # if the image in the predictions, then compute oks
         if image_id in prediction_id_set:
-            oks = compute_oks(anno=annotations['annos'][image_id], \
-                              predict=predictions['annos'][image_id]['keypoint_annos'], \
+            oks = compute_oks(anno=annotations['annos'][image_id],
+                              predict=predictions['annos'][image_id]['keypoint_annos'],
                               delta=annotations['delta'])
             # view pairs with max OKSs as match ones, add to oks_all
             oks_all = np.concatenate((oks_all, np.max(oks, axis=1)), axis=0)
@@ -162,7 +169,7 @@ def keypoint_eval(predictions, annotations, return_dict):
     return return_dict
 
 
-def main():
+def test_anno_file():
     """The evaluator."""
 
     # Arguments parser
@@ -207,5 +214,101 @@ def main():
     'Score: ', '%.8f' % return_dict['score']
 
 
+def test_net():
+    from model.peleenet import PeleePoseNet
+    from model.RTNet import RTNet, RTNet_Half
+    import torch
+    import cv2
+    import os
+    from pose_decode import decode_pose
+
+    use_gpu = True
+    is_resize = True
+    four_out = True
+
+    gt_anno_file = '/mnt/data/dataset/PoseData/ai_challenger_valid_test/ai_challenger_keypoint_validation_20170911/keypoint_validation_annotations_20170911.json'
+    image_root_path = '/mnt/data/dataset/PoseData/ai_challenger_valid_test/ai_challenger_keypoint_validation_20170911/keypoint_validation_images_20170911'
+    # model_file = 'result/checkpoint/1101/epoch_9_0.014181.cpkt'
+    # model_file = 'result/checkpoint/1026/epoch_12_0.025852.cpkt'
+    model_file = 'result/checkpoint/1030_1/epoch_8_0.028339.cpkt'
+    # net = PeleePoseNet()
+    # net = RTNet()
+    net = RTNet_Half()
+    param = {'thre1': 0.3, 'thre2': 0.05, 'thre3': 0.5}
+
+    if use_gpu:
+        net = net.cuda()
+    net.load_state_dict(torch.load(model_file))
+    net.eval()
+
+    image_list = []
+    annos = json.load(open(gt_anno_file))
+    for anno in annos:
+        image_list.append(anno['image_id'])
+
+    predictions = dict()
+    predictions['image_ids'] = []
+    predictions['annos'] = dict()
+
+    for num, image_id in enumerate(image_list):
+
+        src_img = cv2.imread(os.path.join(image_root_path, image_id) + '.jpg')
+        image = src_img.copy()
+        if is_resize:
+            image = cv2.resize(image, (368, 368))
+
+        img = np.transpose(image, [2, 0, 1])
+        img = np.asarray(img, dtype=np.float32) / 255
+        img = torch.from_numpy(img)
+        img = torch.Tensor.unsqueeze(img, 0)
+        if use_gpu:
+            img = img.cuda()
+        if four_out:
+            _, _, heatmaps, pafs = net(img)
+        else:
+            heatmaps, pafs = net(img)
+
+        heatmaps = heatmaps.cpu().data.numpy().transpose(0, 2, 3, 1)
+        pafs = pafs.cpu().data.numpy().transpose(0, 2, 3, 1)
+        canvas, joint_list, person_to_joint_assoc = decode_pose(image, param, heatmaps[0], pafs[0])
+
+        print('[{}] current Image:{} joins:{} persons:{}'.format(num, image_id, joint_list.size, person_to_joint_assoc.size))
+
+
+        predictions['image_ids'].append(image_id)
+        predictions['annos'][image_id] = dict()
+
+        if joint_list.size < 1:
+            predictions['annos'][image_id]['keypoint_annos'] = {}
+            continue
+        scale_x = src_img.shape[1] / image.shape[1]
+        scale_y = src_img.shape[0] / image.shape[0]
+        points = joint_list[:, 0:2] * [scale_x, scale_y]
+        # points = joint_list[:, 0:2]
+
+        person = {}
+        for i, p in enumerate(person_to_joint_assoc):
+            person['human%d'%i] = []
+            for j in p[0:4]:
+                if j < 0:
+                    person['human%d' % i] += [0, 0, 1]
+                else:
+                    person['human%d' % i] += list(points[int(j)]) + [1]
+        predictions['annos'][image_id]['keypoint_annos'] = person
+
+    with open('test111.json', 'w') as f:
+        json.dump(predictions, f)
+
+    return_dict = {}
+    return_dict['error'] = None
+    return_dict['warning'] = []
+    return_dict['score'] = None
+    annotations = load_annotations(gt_anno_file, return_dict )
+
+    return_dict = keypoint_eval(predictions, annotations, return_dict)
+    print(len(return_dict['warning']))
+    print('error: ', return_dict['error'])
+    print('score: ', return_dict['score'])
+
 if __name__ == "__main__":
-    main()
+    test_net()

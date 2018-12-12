@@ -5,6 +5,8 @@ import json
 from torch.utils.data import DataLoader, Dataset
 from skimage.filters import gaussian
 import os
+from image_augmentation import *
+import random
 
 ''' data set 
 train: 
@@ -46,12 +48,13 @@ tip: 1 and 2 means the keypoint has been annotated
 
 
 class AIChallenge(Dataset):
-    def __init__(self, image_path, anno_file, params_transform=None):
+    def __init__(self, image_path, anno_file, params_transform=None, use_aug=False):
         self.image_path = image_path
         self.anno_file = anno_file
         self.image_names = []
         self.keypoints = []
         self.human_rects = []
+        self.use_aug = use_aug
         self.params_transform = params_transform
         self.feature_map_size_x = int(self.params_transform['crop_size_x'] / self.params_transform['feature_map_ratio'])
         self.feature_map_size_y = int(self.params_transform['crop_size_y'] / self.params_transform['feature_map_ratio'])
@@ -149,7 +152,7 @@ class AIChallenge(Dataset):
         for i in range(len(pt1)):
             count = np.zeros((self.feature_map_size_y, self.feature_map_size_x), dtype=np.uint32)
             for key, val in keypoints.items():
-                if val[pt1[i], 2] < 3 and val[pt2[i], 2] <3:
+                if val[pt1[i], 2] < 3 and val[pt2[i], 2] < 3:
                     centerA = val[pt1[i], :2] / self.feature_map_ratio
                     centerB = val[pt2[i], :2] / self.feature_map_ratio
                     paf_map, mask = self.create_paf_map(centerA, centerB, self.feature_map_size_x, self.feature_map_size_y, self.paf_width_thre)
@@ -159,7 +162,7 @@ class AIChallenge(Dataset):
 
                     mask = count == 0
                     count[mask == True] = 1
-                    pafs[2*i:2*i+1, :, :] = np.divide(pafs[2*i:2*i+1, :, :], count[np.newaxis, :, :])
+                    pafs[2*i:2*i+2, :, :] = np.divide(pafs[2*i:2*i+2, :, :], count[np.newaxis, :, :])
                     count[mask == True] = 0
         return pafs
 
@@ -174,12 +177,19 @@ class AIChallenge(Dataset):
         image_name = self.image_names[index]
         img = cv2.imread(os.path.join(self.image_path, image_name + '.jpg'))
         keypoints = self.keypoints[index]
+        if self.use_aug:
+            # if just one person in the image, increase scale ratio
+            # if more than one in the image, not shrink too much
+            # because people overlap effect heatmaps
+            if len(keypoints) < 2:
+                scale = random.random()*1.4 + 1
+            else:
+                scale = random.random()*0.4 + 1
+            img, keypoints = aug_scale_pad(img, keypoints, scale)
+
         keypoints = self.get_scale_point(img.shape, keypoints)
         img = cv2.resize(img, (self.params_transform['crop_size_x'], self.params_transform['crop_size_x']))
-        # for key, val in keypoints.items():
-        #     for point in val:
-        #         cv2.circle(img, (int(round(point[0])), int(round(point[1]))), 4, (255, 0, 0))
-        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
         img = np.transpose(img, [2, 0, 1])
         img = np.asarray(img, dtype=np.float32) / 255
 
@@ -200,7 +210,7 @@ if __name__ == "__main__":
 
     image_path = '/mnt/data/dataset/PoseData/ai_challenger_valid_test/ai_challenger_keypoint_validation_20170911/keypoint_validation_images_20170911'
     anno_file = '/mnt/data/dataset/PoseData/ai_challenger_valid_test/ai_challenger_keypoint_validation_20170911/keypoint_validation_annotations_20170911.json'
-    dataset = AIChallenge(image_path, anno_file, params_transform)
+    dataset = AIChallenge(image_path, anno_file, params_transform, use_aug=True)
 
     print('image nums: ', dataset.numImages)
     index = random.randint(0, dataset.numImages-1)

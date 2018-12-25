@@ -29,7 +29,6 @@ import json
 import time
 import argparse
 import pprint
-
 import numpy as np
 
 
@@ -65,7 +64,7 @@ def load_annotations(anno_file, return_dict):
 
 def load_predictions(prediction_file, return_dict):
     """Convert prediction JSON file."""
-
+    point_4_id = [0, 3, 12, 13]
     predictions = dict()
     predictions['image_ids'] = []
     predictions['annos'] = dict()
@@ -94,7 +93,14 @@ def load_predictions(prediction_file, return_dict):
             id_set.add(image_id)
         predictions['image_ids'].append(image_id)
         predictions['annos'][pred['image_id']] = dict()
-        predictions['annos'][pred['image_id']]['keypoint_annos'] = pred['keypoint_annotations']
+        aa = {}
+        for key, val in pred['keypoint_annotations'].items():
+            val = np.asarray(val).reshape(-1, 3)
+            val = val[point_4_id]
+            val = list(val.reshape(-1,))
+            aa[key] = val
+
+        predictions['annos'][pred['image_id']]['keypoint_annos'] = aa
 
     return predictions
 
@@ -118,7 +124,7 @@ def compute_oks(anno, predict, delta):
         scale = np.float32((bbox[3] - bbox[1]) * (bbox[2] - bbox[0]))
         if np.sum(visible) == 0:
             for j in range(predict_count):
-                oks[i, j] = 0
+                oks[i,  j] = 0
         else:
             # for every predicted human
             for j in range(predict_count):
@@ -152,7 +158,7 @@ def keypoint_eval(predictions, annotations, return_dict):
             oks_num += np.max(oks.shape)
         else:
             # otherwise report warning
-            return_dict['warning'].append(image_id + ' is not in the prediction JSON file.')
+            return_dict['warning'].append(image_id + ' is not in the prediction JSON file.\n')
             # number of humen in ground truth annotations
             gt_n = len(annotations['annos'][image_id]['human_annos'].keys())
             # fill 0 in oks scores
@@ -171,6 +177,8 @@ def keypoint_eval(predictions, annotations, return_dict):
 
 def test_anno_file():
     """The evaluator."""
+    gt_anno_file = '/mnt/data/dataset/PoseData/ai_challenger_valid_test/ai_challenger_keypoint_validation_20170911/keypoint_validation_annotations_20170911.json'
+    predicit_file = '/mnt/data/dataset/PoseData/ai_challenger_valid_test/ai_challenger_keypoint_validation_20170911/keypoint_validation_annotations_20170911.json'
 
     # Arguments parser
     parser = argparse.ArgumentParser()
@@ -188,14 +196,14 @@ def test_anno_file():
 
     # Load annotation JSON file
     start_time = time.time()
-    annotations = load_annotations(anno_file=args.ref,
+    annotations = load_annotations(anno_file=gt_anno_file,
                                    return_dict=return_dict)
     print
     'Complete reading annotation JSON file in %.2f seconds.' % (time.time() - start_time)
 
     # Load prediction JSON file
     start_time = time.time()
-    predictions = load_predictions(prediction_file=args.submit,
+    predictions = load_predictions(prediction_file=predicit_file,
                                    return_dict=return_dict)
     print
     'Complete reading prediction JSON file in %.2f seconds.' % (time.time() - start_time)
@@ -229,12 +237,14 @@ def test_net():
     gt_anno_file = '/mnt/data/dataset/PoseData/ai_challenger_valid_test/ai_challenger_keypoint_validation_20170911/keypoint_validation_annotations_20170911.json'
     image_root_path = '/mnt/data/dataset/PoseData/ai_challenger_valid_test/ai_challenger_keypoint_validation_20170911/keypoint_validation_images_20170911'
     # model_file = 'result/checkpoint/1101/epoch_9_0.014181.cpkt'
-    # model_file = 'result/checkpoint/1026/epoch_12_0.025852.cpkt'
-    model_file = 'result/checkpoint/1030_1/epoch_8_0.028339.cpkt'
+    model_file = 'result/checkpoint/1026/epoch_12_0.025852.cpkt'
+    # model_file = 'result/checkpoint/1217/epoch_6_0.008613.cpkt'
+    # model_file = "result/checkpoint/1217/epoch_25_0.007546.cpkt"
+
     # net = PeleePoseNet()
     # net = RTNet()
-    net = RTNet_Half()
-    param = {'thre1': 0.3, 'thre2': 0.05, 'thre3': 0.5}
+    net = RTNet_Half(1)
+    param = {'thre1': 0.1, 'thre2': 0.00, 'thre3': 0.5}
 
     if use_gpu:
         net = net.cuda()
@@ -252,6 +262,8 @@ def test_net():
 
     for num, image_id in enumerate(image_list):
 
+        # if num > 100:
+            # break
         src_img = cv2.imread(os.path.join(image_root_path, image_id) + '.jpg')
         image = src_img.copy()
         if is_resize:
@@ -296,8 +308,8 @@ def test_net():
                     person['human%d' % i] += list(points[int(j)]) + [1]
         predictions['annos'][image_id]['keypoint_annos'] = person
 
-    with open('test111.json', 'w') as f:
-        json.dump(predictions, f)
+    # with open('test111.json', 'w') as f:
+    #     json.dump(predictions, f)
 
     return_dict = {}
     return_dict['error'] = None
@@ -310,5 +322,7 @@ def test_net():
     print('error: ', return_dict['error'])
     print('score: ', return_dict['score'])
 
+
 if __name__ == "__main__":
     test_net()
+    # test_anno_file()

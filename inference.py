@@ -37,6 +37,7 @@ def inference(src_img, net, param, use_gpu=False):
 def time_test(net, use_gpu):
     with torch.no_grad() :
         input = np.random.rand(1, 3, 368, 368).astype(np.float32)
+        # input = np.random.rand(1, 3, 640, 480).astype(np.float32)
         input = torch.from_numpy(input)
         if use_gpu:
             input = input.cuda()
@@ -52,7 +53,8 @@ def time_test(net, use_gpu):
 
 
 def showheatmap():
-    use_gpu = False
+    # use_gpu = False
+    use_gpu = True
     model_path = 'result/checkpoint/1030_1/epoch_8_0.028339.cpkt'
     # image_path = 'data/4.jpg'
     image_path = '/mnt/data/dataset/PoseData/ai_challenger_valid_test/ai_challenger_keypoint_test_a_20180103/' \
@@ -60,6 +62,7 @@ def showheatmap():
     net = RTNet()
     if use_gpu:
         net = net.cuda()
+
 
     writer = SummaryWriter(log_dir='data/')
     src_img = cv2.imread(image_path)
@@ -107,37 +110,60 @@ def showheatmap():
 
 
 if __name__ == '__main__':
-    use_gpu = False
+    import sys
+    from model.Light_open_pose import LightOpenPose
+    # use_gpu = False
+    use_gpu = True
 
-    is_resize = True
+
+    video_name = '/mnt/data/project/dataset/111.ts'
+    # video_name = '/mnt/data/project/dataset/fall_detection/video_fall2.mp4'
+    # video_name = '/mnt/data/project/dataset/many_people.avi'
+    # video_name = '/mnt/data/project/dataset/peopleCounting/1.mp4'
+
+    if len(sys.argv) > 1:
+        video_name = sys.argv[1]
+
+    is_resize = True 
+    # is_resize = False 
     # model_path = 'result/checkpoint/1030_1/epoch_8_0.028339.cpkt'
-    model_path = 'result/checkpoint/1016/epoch_5.cpkt'
-    # net = RTNet_Half()
-    net = RTNet()
-    # net = PeleePoseNet()
+    # model_path = 'result/checkpoint/1016/epoch_5.cpkt'
+    # model_path = 'result/checkpoint/1217/epoch_0_0.012472.cpkt'
+    model_path = 'result/checkpoint/1217/epoch_25_0.007546.cpkt'
+    # net = RTNet_Half(4)
+    # net = RTNet()
+    net = PeleePoseNet()
+    # net = LightOpenPose()
     if use_gpu:
         torch.backends.cudnn.benchmark = True
         net = net.cuda()
     net.load_state_dict(torch.load(model_path))
     net.eval()
     
+    print("load model over")
     # test model inference time
-    time_test(net, use_gpu)
-
+    # time_test(net, use_gpu)
+    # exit(0)
+    
     # test video human keypoints and limbs, display result
-    # param = {'thre1': 0.3, 'thre2': 0.05, 'thre3': 0.5}
-    # capture = cv2.VideoCapture('/mnt/data/project/ulsPoseDetectTrack/data/111.ts')
-    # i = 0
-    # while(True):
-    #     i += 1
-    #     if i%2 == 0:
-    #         continue
-    #     retval, img = capture.read()
-    #     if not retval:
-    #         break
-    #     if is_resize:
-    #         # img = cv2.resize(img, (int(368), int(368)))
-    #         img = cv2.resize(img, (int(img.shape[1]/2), int(img.shape[0]/2)))
-    #     canvas = inference(img, net, param, use_gpu)
-    #     cv2.imshow('result', canvas)
-    #     cv2.waitKey(10)
+    param = {'thre1': 0.2, 'thre2': 0.00, 'thre3': 0.5}
+    capture = cv2.VideoCapture(video_name)
+    i = 0
+    while(True):
+        # i += 1
+        # if i%2 == 0:
+            # continue
+        retval, img = capture.read()
+        if not retval:
+            break
+        if is_resize:
+            # img = cv2.resize(img, (int(640), int(480)))
+            # img = cv2.resize(img, (int(368), int(368)))
+            # img = cv2.resize(img, (int(img.shape[1]/2), int(img.shape[0]/2)))
+            print("image size:{}*{} ".format(img.shape[0], img.shape[1]))
+        canvas = inference(img, net, param, use_gpu)
+        cv2.imshow('result', canvas)
+
+        # print('keynote: ', keynote)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+           break 

@@ -98,13 +98,13 @@ class RTNet(nn.Module):
 
 
 class RTNet_Half(nn.Module):
-    def __init__(self):
+    def __init__(self, channel_scale):
         super(RTNet_Half, self).__init__()
-        self.stage_first = stage_first(4)
-        self.stage_block_cpm = stage_block_CPM(4, 4)
-        self.stage_block_paf = stage_block_PAF(4, 4)
-        self.stage_last_cpm = stage_last_CPM(4, 4)
-        self.stage_last_paf = stage_last_PAF(4, 4)
+        self.stage_first = stage_first(channel_scale)
+        self.stage_block_cpm = stage_block_CPM(channel_scale, channel_scale)
+        self.stage_block_paf = stage_block_PAF(channel_scale, channel_scale)
+        self.stage_last_cpm = stage_last_CPM(channel_scale, channel_scale)
+        self.stage_last_paf = stage_last_PAF(channel_scale, channel_scale)
 
     def forward(self, input):
         y = self.stage_first(input)

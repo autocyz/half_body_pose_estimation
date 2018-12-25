@@ -20,8 +20,9 @@ from torch.optim.lr_scheduler import StepLR
 from tensorboardX import SummaryWriter
 from utils import save_params, get_lr
 
+total_iter = 0
 
-def train(train_loader, net, criterion, optimizer, epoch, loader_info=''):
+def train(train_loader, net, criterion, optimizer, epoch, have_loader_nums=0,  loader_info=''):
     time4 = 0
     for i, (img, heatmaps, pafs) in enumerate(train_loader):
         time4_last = time4
@@ -57,9 +58,11 @@ def train(train_loader, net, criterion, optimizer, epoch, loader_info=''):
         # loss_paf.backward()
         optimizer.step()
         time4 = time.time()
-
+        
         # writer some train information
-        total_iter = epoch * len(train_loader) + i
+        global total_iter 
+        total_iter += 1
+
         writer.add_scalar('train_loss_cpm', loss_cpm.item(), total_iter)
         writer.add_scalar('train_loss_paf', loss_paf.item(), total_iter)
         writer.add_scalars('all_loss', {'cpm': loss_cpm.item(), 'paf': loss_paf.item(), 'total': total_loss.item()}, total_iter)
@@ -68,7 +71,7 @@ def train(train_loader, net, criterion, optimizer, epoch, loader_info=''):
               '\tloss_cpm {:.3f}\tloss_paf {:.3f} \tTotal_loss {:.3f}\n'
               'T_dataprocess:{:.5f} T_forward:{:.5f} T_backward:{:.5f}'.
               format(epoch, params_transform['epoch_num'], i,
-                     len(train_loader), loader_info, get_lr(optimizer),
+                     len(train_loader)+have_loader_nums, loader_info, get_lr(optimizer),
                      loss_cpm.item(),
                      loss_paf.item(), total_loss.item(),
                      time0-time4_last, time2-time1, time4-time3))
@@ -118,13 +121,13 @@ if __name__ == "__main__":
     mode_save_path = './result/checkpoint/'
 
     print('loading trainset')
-    trainset = AIChallenge(train_image_path, train_anno_file, params_transform)
+    trainset = AIChallenge(train_image_path, train_anno_file, params_transform, use_aug=True)
     print('loading valset')
-    valset = AIChallenge(val_image_path, val_anno_file, params_transform)
+    valset = AIChallenge(val_image_path, val_anno_file, params_transform, use_aug=False)
     print('loading testset a')
-    testset_a = AIChallenge(test_image_path_a, test_anno_file_a, params_transform)
+    testset_a = AIChallenge(test_image_path_a, test_anno_file_a, params_transform, use_aug=True)
     print('loading testset b')
-    testset_b = AIChallenge(test_image_path_b, test_anno_file_b, params_transform)
+    testset_b = AIChallenge(test_image_path_b, test_anno_file_b, params_transform, use_aug=True)
 
     train_loader = DataLoader(trainset,
                               batch_size=params_transform['batch_size'],
@@ -159,48 +162,28 @@ if __name__ == "__main__":
     net = net.cuda()
     optimizer = torch.optim.Adam(net.parameters(), lr=params_transform['learning_rate'], weight_decay=params_transform['weight_decay'])
     # lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.8, patience=5, verbose=True, threshold=1e-4)
-    lr_scheduler = StepLR(optimizer, step_size=5, gamma=0.5)
+    lr_scheduler = StepLR(optimizer, step_size=10, gamma=0.1)
     criterion = torch.nn.MSELoss(reduction='elementwise_mean').cuda()
+    # criterion = torch.nn.MSELoss(size_average=True, reduce=True).cuda()
 
-    date = '1101'
+    date = '1217'
     writer = SummaryWriter(log_dir='./result/logdir/' + date)
     model_path = os.path.join('./result/checkpoint/', date)
     if not os.path.exists(model_path):
         os.mkdir(model_path)
 
-    params_transform['train_log'] = '使用peleenet网络进行训练,在昨天的基础上行将学习率降低10倍'
+    params_transform['train_log'] = '修改成正确的paf生成方式，重新训练peleenet，看看效果'
     save_params(model_path, 'parameter', params_transform)
-    # writer.add_graph(net, torch.ones(16, 3, 368, 368))
-    # if params_transform['has_checkpoint']:
-    #     net.eval()
-    #     val_loss = 0.
-    #     with torch.no_grad():
-    #         for i, (img, heatmaps, pafs) in enumerate(val_loader):
-    #             heatmaps = heatmaps.float().cuda()
-    #             pafs = pafs.float().cuda()
-    #             img = img.cuda()
-    #             cpm_1, paf_1, cpm_p, paf_p = net(img)
-    #
-    #             loss_cpm1 = criterion(heatmaps, cpm_1)
-    #             loss_paf1 = criterion(pafs, paf_1)
-    #             loss_cpm = criterion(heatmaps, cpm_p)
-    #             loss_paf = criterion(pafs, paf_p)
-    #             total_loss = loss_cpm + loss_paf + loss_cpm1 + loss_paf1
-    #             val_loss += total_loss
-    #             if i % 50 == 0:
-    #                 print('Step [{}/{}]  current loss [{}]'.format(i, len(val_loader), total_loss))
-    #     val_loss = val_loss / len(val_loader)
-    #     best_loss = val_loss
 
     best_loss = np.inf
     for epoch in range(params_transform['epoch_num']):
         # train
-        # lr_scheduler.step()
+        lr_scheduler.step()
         net.train()
         time4 = time.time()
-        train(test_a_loader, net, criterion, optimizer, epoch, 'test_a')
-        train(test_b_loader, net, criterion, optimizer, epoch, 'test_b')
-        train(train_loader, net, criterion, optimizer, epoch, 'train')
+        train(test_a_loader, net, criterion, optimizer, epoch, have_loader_nums = 0, loader_info = 'test_a')
+        train(test_b_loader, net, criterion, optimizer, epoch, have_loader_nums = len(test_a_loader), loader_info = 'test_b')
+        train(train_loader, net, criterion, optimizer, epoch, have_loader_nums = len(test_a_loader) + len(test_b_loader), loader_info = 'train')
 
         # validation
         net.eval()

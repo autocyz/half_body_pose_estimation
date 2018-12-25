@@ -20,6 +20,28 @@ from scipy import misc, ndimage
 :param params_transform: store the value of stride and crop_szie_y, crop_size_x                 
 """
 
+def aug_scale_pad(img, keypoints, scale):
+    height, width, channel = img.shape
+    size = int(max(height, width)*scale)
+
+    # compute pad size of every side
+    pad_top = int((size - height)/2)
+    pad_down = size - height - pad_top
+    pad_left = int((size - width)/2)
+    pad_right = size - width - pad_left
+
+    img = cv2.copyMakeBorder(img, pad_top, pad_down, pad_left, pad_right, cv2.BORDER_REPLICATE)
+
+    keypoints_return = {}
+    for key, val in keypoints.items():
+        keypoints_return[key] = val + np.asarray([pad_left, pad_top, 0])
+
+    return img, keypoints_return
+
+# def aug_reduce(img, keypoints, human_rects, params_transform):
+
+
+
 
 def aug_scale(img, keypoints, human_rects, params_transform):
     """ data scale augmentation

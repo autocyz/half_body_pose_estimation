@@ -138,8 +138,9 @@ class AIChallenge(Dataset):
                 if val[i, 2] < 3:
                     center = val[i, :2] / self.feature_map_ratio
                     gaass_map = self.create_gauss_map(center, self.feature_map_size_x, self.feature_map_size_y, self.params_transform['sigma'])
-                    heatmaps[i, :, :] += gaass_map
-                    heatmaps[i, :, :][heatmaps[i, :, :] > 1.0] = 1.0
+                    # heatmaps[i, :, :] += gaass_map
+                    # heatmaps[i, :, :][heatmaps[i, :, :] > 1.0] = 1.0
+                    heatmaps[i, :, :] = np.maximum(gaass_map, heatmaps[i, :, :])
         # add negative heatmap
         heatmaps[-1, :, :] = np.maximum(1 - np.max(heatmaps[:-1, :, :], axis=0), 0.)
         return heatmaps

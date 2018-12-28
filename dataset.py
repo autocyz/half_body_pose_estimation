@@ -55,6 +55,7 @@ class AIChallenge(Dataset):
         self.keypoints = []
         self.human_rects = []
         self.use_aug = use_aug
+        self.scale_aug_prob = 0.5 # prob for scale_aug_prob 
         self.params_transform = params_transform
         self.feature_map_size_x = int(self.params_transform['crop_size_x'] / self.params_transform['feature_map_ratio'])
         self.feature_map_size_y = int(self.params_transform['crop_size_y'] / self.params_transform['feature_map_ratio'])
@@ -176,17 +177,23 @@ class AIChallenge(Dataset):
 
     def __getitem__(self, index):
         image_name = self.image_names[index]
-        img = cv2.imread(os.path.join(self.image_path, image_name + '.jpg'))
+        image_full_path = os.path.join(self.image_path, image_name + '.jpg')
+        if not os.path.isfile(image_full_path):
+            print("file {} not exist!!!".format(image_full_path))
+        img = cv2.imread(image_full_path)
         keypoints = self.keypoints[index]
+
+         
         if self.use_aug:
-            # if just one person in the image, increase scale ratio
-            # if more than one in the image, not shrink too much
-            # because people overlap effect heatmaps
-            if len(keypoints) < 2:
-                scale = random.random()*1.4 + 1
-            else:
-                scale = random.random()*0.4 + 1
-            img, keypoints = aug_scale_pad(img, keypoints, scale)
+            if random.random() < self.scale_aug_prob:
+                # if just one person in the image, increase scale ratio
+                # if more than one in the image, not shrink too much
+                # because people overlap effect heatmaps
+                if len(keypoints) < 2:
+                    scale = random.random()*1.4 + 1
+                else:
+                    scale = random.random()*0.4 + 1
+                img, keypoints = aug_scale_pad(img, keypoints, scale)
 
         keypoints = self.get_scale_point(img.shape, keypoints)
         img = cv2.resize(img, (self.params_transform['crop_size_x'], self.params_transform['crop_size_x']))

@@ -112,28 +112,32 @@ def showheatmap():
 if __name__ == '__main__':
     import sys
     from model.Light_open_pose import LightOpenPose
+    
     # use_gpu = False
     use_gpu = True
 
-
+    model_path = 'result/checkpoint/1217/epoch_25_0.007546.cpkt'
+    # model_path = 'result/checkpoint/1030_1/epoch_8_0.028339.cpkt'
+    # model_path = 'result/checkpoint/1016/epoch_5.cpkt'
+    # model_path = 'result/checkpoint/1217/epoch_0_0.012472.cpkt'
+    
     video_name = '/mnt/data/project/dataset/111.ts'
     # video_name = '/mnt/data/project/dataset/fall_detection/video_fall2.mp4'
     # video_name = '/mnt/data/project/dataset/many_people.avi'
     # video_name = '/mnt/data/project/dataset/peopleCounting/1.mp4'
 
-    if len(sys.argv) > 1:
-        video_name = sys.argv[1]
+    if len(sys.argv) > 2:
+        model_path = sys.argv[1]
+        video_name = sys.argv[2]
 
-    is_resize = True 
-    # is_resize = False 
-    # model_path = 'result/checkpoint/1030_1/epoch_8_0.028339.cpkt'
-    # model_path = 'result/checkpoint/1016/epoch_5.cpkt'
-    # model_path = 'result/checkpoint/1217/epoch_0_0.012472.cpkt'
-    model_path = 'result/checkpoint/1217/epoch_25_0.007546.cpkt'
+    # is_resize = True
+    is_resize = False
+    
+    net = PeleePoseNet()
     # net = RTNet_Half(4)
     # net = RTNet()
-    net = PeleePoseNet()
     # net = LightOpenPose()
+    
     if use_gpu:
         torch.backends.cudnn.benchmark = True
         net = net.cuda()
@@ -141,12 +145,17 @@ if __name__ == '__main__':
     net.eval()
     
     print("load model over")
+
+    #=============================
     # test model inference time
+
     # time_test(net, use_gpu)
     # exit(0)
-    
+
+    #=============================
+
     # test video human keypoints and limbs, display result
-    param = {'thre1': 0.2, 'thre2': 0.00, 'thre3': 0.5}
+    param = {'thre1': 0.5, 'thre2': 0.05, 'thre3': 0.5}
     capture = cv2.VideoCapture(video_name)
     i = 0
     while(True):
@@ -157,7 +166,7 @@ if __name__ == '__main__':
         if not retval:
             break
         if is_resize:
-            # img = cv2.resize(img, (int(640), int(480)))
+            img = cv2.resize(img, (int(640), int(480)))
             # img = cv2.resize(img, (int(368), int(368)))
             # img = cv2.resize(img, (int(img.shape[1]/2), int(img.shape[0]/2)))
             print("image size:{}*{} ".format(img.shape[0], img.shape[1]))

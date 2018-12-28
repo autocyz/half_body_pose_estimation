@@ -232,18 +232,18 @@ def test_net():
 
     use_gpu = True
     is_resize = True
-    four_out = True
+    four_out = False
 
-    gt_anno_file = '/mnt/data/dataset/PoseData/ai_challenger_valid_test/ai_challenger_keypoint_validation_20170911/keypoint_validation_annotations_20170911.json'
-    image_root_path = '/mnt/data/dataset/PoseData/ai_challenger_valid_test/ai_challenger_keypoint_validation_20170911/keypoint_validation_images_20170911'
+    gt_anno_file = '/mnt/data/dataset/PoseData/ai_challenge_2017/ai_challenger_valid_test/ai_challenger_keypoint_validation_20170911/keypoint_validation_annotations_20170911.json'
+    image_root_path = '/mnt/data/dataset/PoseData/ai_challenge_2017/ai_challenger_valid_test/ai_challenger_keypoint_validation_20170911/keypoint_validation_images_20170911'
     # model_file = 'result/checkpoint/1101/epoch_9_0.014181.cpkt'
-    model_file = 'result/checkpoint/1026/epoch_12_0.025852.cpkt'
+    model_file = 'result/checkpoint/1226/epoch_22_0.005897.cpkt'
     # model_file = 'result/checkpoint/1217/epoch_6_0.008613.cpkt'
     # model_file = "result/checkpoint/1217/epoch_25_0.007546.cpkt"
 
-    # net = PeleePoseNet()
+    net = PeleePoseNet()
     # net = RTNet()
-    net = RTNet_Half(1)
+    # net = RTNet_Half(1)
     param = {'thre1': 0.1, 'thre2': 0.00, 'thre3': 0.5}
 
     if use_gpu:

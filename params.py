@@ -21,15 +21,16 @@ params_transform['np'] = 56
 params_transform['sigma'] = 2.0
 
 # train params
-params_transform['epoch_num'] = 20
-params_transform['batch_size'] = 64
-params_transform['num_workers'] = 4
+params_transform['epoch_num'] = 50
+params_transform['batch_size'] = 128
+params_transform['num_workers'] = 64 
 params_transform['learning_rate'] = 1e-4
 params_transform['momentum'] = 0.9
 params_transform['weight_decay'] = 1e-5
 params_transform['nesterov'] = True
-params_transform['display'] = 10
+params_transform['display'] = 50
+params_transform['gpu_ids'] = [ 0, 1  ]
 
-# params_transform['pretrain_model'] = './result/checkpoint/1030/epoch_4_0.028393.cpkt'
+# params_transform['pretrain_model'] = './result/checkpoint/1217/epoch_6_0.008613.cpkt'
 params_transform['pretrain_model'] = None
 
